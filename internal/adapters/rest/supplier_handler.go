@@ -155,7 +155,7 @@ func (h *SupplierHandler) Delete(c *fiber.Ctx) error {
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to delete supplier",
+			"error": err.Error(),
 		})
 	}
 

@@ -27,3 +27,23 @@ type Project struct {
 	CreatedAt   time.Time       `db:"created_at"`
 	UpdatedAt   sql.NullTime    `db:"updated_at"`
 }
+
+type ProjectStatusCheck struct {
+	ProjectStatus   string         `db:"project_status"`
+	BOQStatus       sql.NullString `db:"boq_status"`
+	QuotationStatus sql.NullString `db:"quotation_status"`
+}
+
+type ProjectOverview struct {
+	QuotationID       uuid.UUID       `db:"quotation_id"`
+	BOQID             uuid.UUID       `db:"boq_id"`
+	TotalOverallCost  sql.NullFloat64 `db:"total_overall_cost"`
+	TotalSellingPrice sql.NullFloat64 `db:"total_selling_price"`
+	TaxPercentage     sql.NullFloat64 `db:"tax_percentage"`
+	TotalActualCost   sql.NullFloat64 `db:"total_actual_cost"`
+}
+
+type ProjectSummary struct {
+	ProjectOverview
+	Jobs []JobSummary
+}

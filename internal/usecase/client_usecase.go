@@ -29,7 +29,6 @@ func NewClientUsecase(clientRepo repositories.ClientRepository) ClientUsecase {
 }
 
 func (u *clientUsecase) Create(ctx context.Context, req requests.CreateClientRequest) (*responses.ClientResponse, error) {
-	// Check if client with email already exists
 	existing, err := u.clientRepo.GetByEmail(ctx, req.Email)
 	if err == nil && existing != nil {
 		return nil, errors.New("client with this email already exists")
@@ -51,13 +50,11 @@ func (u *clientUsecase) Create(ctx context.Context, req requests.CreateClientReq
 }
 
 func (u *clientUsecase) Update(ctx context.Context, id uuid.UUID, req requests.UpdateClientRequest) error {
-	// Check if client exists
 	existing, err := u.clientRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	// Check if new email conflicts with another client
 	if existing.Email != req.Email {
 		client, err := u.clientRepo.GetByEmail(ctx, req.Email)
 		if err == nil && client != nil {

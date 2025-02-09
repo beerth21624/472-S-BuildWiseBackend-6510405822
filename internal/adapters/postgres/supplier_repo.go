@@ -67,7 +67,7 @@ func (r *supplierRepository) Update(ctx context.Context, id uuid.UUID, req reque
             name = :name,
             email = :email,
             tel = :tel,
-            address = :address,
+            address = :address
         WHERE supplier_id = :supplier_id`
 
 	params := map[string]interface{}{
@@ -98,9 +98,48 @@ func (r *supplierRepository) Update(ctx context.Context, id uuid.UUID, req reque
 	return nil
 }
 func (r *supplierRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `DELETE FROM Supplier WHERE supplier_id = $1`
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
 
-	result, err := r.db.ExecContext(ctx, query, id)
+	// Check if supplier is being used
+	type ProjectUsage struct {
+		ProjectID   uuid.UUID `db:"project_id"`
+		ProjectName string    `db:"project_name"`
+		BOQID       uuid.UUID `db:"boq_id"`
+	}
+
+	checkUsageQuery := `
+        SELECT DISTINCT 
+            pj.project_id,
+            pj.name as project_name,
+            b.boq_id
+        FROM supplier sp 
+        JOIN material_price_log mpl ON sp.supplier_id = mpl.supplier_id 
+        JOIN boq b ON b.boq_id = mpl.boq_id 
+        JOIN project pj ON pj.project_id = b.project_id 
+        WHERE sp.supplier_id = $1`
+
+	var usages []ProjectUsage
+	err = tx.SelectContext(ctx, &usages, checkUsageQuery, id)
+	if err != nil {
+		return fmt.Errorf("failed to check supplier usage: %w", err)
+	}
+
+	// If supplier is being used, return error with project names
+	if len(usages) > 0 {
+		var projectNames []string
+		for _, usage := range usages {
+			projectNames = append(projectNames, usage.ProjectName)
+		}
+		return fmt.Errorf("supplier is being used in following projects: %s", strings.Join(projectNames, ", "))
+	}
+
+	// If supplier is not being used, proceed with deletion
+	deleteQuery := `DELETE FROM Supplier WHERE supplier_id = $1`
+	result, err := tx.ExecContext(ctx, deleteQuery, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete supplier: %w", err)
 	}
@@ -112,6 +151,11 @@ func (r *supplierRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 	if rows == 0 {
 		return errors.New("supplier not found")
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

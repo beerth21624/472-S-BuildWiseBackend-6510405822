@@ -73,6 +73,41 @@ func main() {
 	MaterialHandler := rest.NewMaterialHandler(materialUseCase)
 	MaterialHandler.MaterialRoutes(app)
 
+	jobRepo := postgres.NewJobRepository(db)
+	jobUseCase := usecase.NewJobUseCase(jobRepo)
+	JobHandler := rest.NewJobHandler(jobUseCase)
+	JobHandler.JobRoutes(app)
+
+	boqRepo := postgres.NewBOQRepository(db)
+	boqUseCase := usecase.NewBOQUsecase(boqRepo, projectRepo)
+	BOQHandler := rest.NewBOQHandler(boqUseCase)
+	BOQHandler.BOQRoutes(app)
+
+	generalCostRepo := postgres.NewGeneralCostRepository(db)
+	generalCostUseCase := usecase.NewGeneralCostUsecase(generalCostRepo, boqRepo)
+	GeneralCostHandler := rest.NewGeneralCostHandler(generalCostUseCase)
+	GeneralCostHandler.GeneralCostRoutes(app)
+
+	companyRepo := postgres.NewCompanyRepository(db)
+	companyUseCase := usecase.NewCompanyUsecase(companyRepo)
+	CompanyHandler := rest.NewCompanyHandler(companyUseCase)
+	CompanyHandler.CompanyRoutes(app)
+
+	contractRepo := postgres.NewContractRepository(db)
+	contractUseCase := usecase.NewContractUsecase(contractRepo, projectRepo)
+	ContractHandler := rest.NewContractHandler(contractUseCase)
+	ContractHandler.ContractRoutes(app)
+
+	quotationRepo := postgres.NewQuotationRepository(db)
+	quotationUseCase := usecase.NewQuotationUsecase(quotationRepo, contractUseCase)
+	QuotationHandler := rest.NewQuotationHandler(quotationUseCase)
+	QuotationHandler.QuotationRoutes(app)
+
+	invoiceRepo := postgres.NewInvoiceRepository(db)
+	invoiceUseCase := usecase.NewInvoiceUsecase(invoiceRepo, projectRepo)
+	InvoiceHandler := rest.NewInvoiceHandler(invoiceUseCase)
+	InvoiceHandler.InvoiceRoutes(app)
+
 	port := getEnv("PORT", "8004")
 	if err := app.Listen(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

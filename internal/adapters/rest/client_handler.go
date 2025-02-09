@@ -169,13 +169,9 @@ func (h *ClientHandler) Delete(c *fiber.Ctx) error {
 
 	err = h.clientUsecase.Delete(c.Context(), id)
 	if err != nil {
-		if err.Error() == "client not found" {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Client not found",
-			})
-		}
+
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to delete client",
+			"error": err.Error(),
 		})
 	}
 

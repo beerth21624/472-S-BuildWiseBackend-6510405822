@@ -101,6 +101,32 @@ func (r *clientRepository) Update(ctx context.Context, id uuid.UUID, req request
 }
 
 func (r *clientRepository) Delete(ctx context.Context, id uuid.UUID) error {
+
+	checkUsageQuery := `
+		SELECT p.name as project_name
+		FROM Client c 
+		JOIN Project p ON c.client_id = p.client_id 
+		WHERE c.client_id = $1`
+
+	type ProjectUsage struct {
+		ProjectName string `db:"project_name"`
+	}
+	var projects []ProjectUsage
+
+	err := r.db.SelectContext(ctx, &projects, checkUsageQuery, id)
+	if err != nil {
+		return fmt.Errorf("failed to check client usage: %w", err)
+	}
+
+	if len(projects) > 0 {
+		var projectNames []string
+		for _, project := range projects {
+			projectNames = append(projectNames, project.ProjectName)
+		}
+		return fmt.Errorf("client is currently used in following projects: %s. Please remove client from these projects before deletion",
+			strings.Join(projectNames, ", "))
+	}
+
 	query := `DELETE FROM Client WHERE client_id = $1`
 
 	result, err := r.db.ExecContext(ctx, query, id)

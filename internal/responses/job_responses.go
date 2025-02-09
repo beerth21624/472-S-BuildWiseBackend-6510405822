@@ -1,33 +1,58 @@
 package responses
 
-import "github.com/google/uuid"
-
-type JobMaterialResponse struct {
-	MaterialID string   `json:"material_id"`
-	Name       string   `json:"name"`
-	Unit       string   `json:"unit"`
-	Quantity   float64  `json:"quantity"`
-	LastPrice  *float64 `json:"last_price,omitempty"`
-}
+import (
+	"github.com/google/uuid"
+)
 
 type JobResponse struct {
-	ID          uuid.UUID             `json:"id"`
-	Name        string                `json:"name"`
-	Description string                `json:"description"`
-	Unit        string                `json:"unit"`
-	Materials   []JobMaterialResponse `json:"materials"`
+	JobID       uuid.UUID `json:"job_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Unit        string    `json:"unit"`
+	Quantity    float64   `json:"quantity"`
+	LaborCost   float64   `json:"labor_cost"`
+}
+
+type JobMaterialResponse struct {
+	JobID       uuid.UUID         `json:"job_id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Unit        string            `json:"unit"`
+	Materials   []JobMaterialItem `json:"materials"`
+}
+type JobUsage struct {
+	IsUsed   bool           `json:"is_used"`
+	Projects []ProjectUsage `json:"projects,omitempty"`
+}
+
+type ProjectUsage struct {
+	ProjectID   uuid.UUID `db:"project_id"`
+	ProjectName string    `db:"project_name"`
+	BOQID       uuid.UUID `db:"boq_id"`
+	BOQStatus   string    `db:"boq_status"`
+}
+type JobMaterialItem struct {
+	MaterialID string  `json:"material_id" db:"material_id"`
+	Name       string  `json:"name" db:"name"`
+	Unit       string  `json:"unit" db:"unit"`
+	Quantity   float64 `json:"quantity" db:"quantity"`
 }
 
 type JobListResponse struct {
-	Jobs  []JobResponse `json:"jobs"`
-	Total int64         `json:"total"`
+	Jobs []JobResponse `json:"jobs"`
 }
 
-type BOQJobResponse struct {
-	JobID        uuid.UUID `json:"job_id"`
-	Name         string    `json:"name"`
-	Unit         string    `json:"unit"`
-	Quantity     int       `json:"quantity"`
-	LaborCost    float64   `json:"labor_cost"`
-	SellingPrice float64   `json:"selling_price"`
+type PaginationResponse struct {
+	CurrentPage  int `json:"current_page"`
+	PageSize     int `json:"page_size"`
+	TotalPages   int `json:"total_pages"`
+	TotalRecords int `json:"total_records"`
+}
+
+// ApiResponse represents a standard API response structure
+type ApiResponse struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+	Error   string      `json:"error,omitempty"`
 }

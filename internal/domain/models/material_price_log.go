@@ -13,5 +13,7 @@ type MaterialPriceLog struct {
 	SupplierID     uuid.UUID       `db:"supplier_id"`
 	ActualPrice    sql.NullFloat64 `db:"actual_price"`
 	EstimatedPrice sql.NullFloat64 `db:"estimated_price"`
+	JobID          uuid.UUID       `db:"job_id"`
+	Quantity       float64         `db:"quantity"`
 	UpdatedAt      sql.NullTime    `db:"updated_at"`
 }

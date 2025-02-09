@@ -6,6 +6,7 @@ import (
 	"boonkosang/internal/usecase"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type MaterialHandler struct {
@@ -23,6 +24,11 @@ func (h *MaterialHandler) MaterialRoutes(app *fiber.App) {
 
 	material.Post("/", h.Create)
 	material.Get("/", h.List)
+
+	material.Get("/:projectId/prices", h.GetMaterialPrices)
+	material.Put("/:boqId/estimated-price", h.UpdateEstimatedPrice)
+	material.Put("/:boqId/actual-price", h.UpdateActualPrice)
+
 	material.Get("/:id", h.GetByID)
 	material.Put("/:id", h.Update)
 	material.Delete("/:id", h.Delete)
@@ -161,12 +167,115 @@ func (h *MaterialHandler) Delete(c *fiber.Ctx) error {
 			})
 		default:
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to delete material",
+				"error": err.Error(),
 			})
 		}
 	}
 
 	return c.JSON(fiber.Map{
 		"message": "Material deleted successfully",
+	})
+}
+
+func (h *MaterialHandler) GetMaterialPrices(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("projectId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	response, err := h.materialUsecase.GetMaterialPrices(c.Context(), projectID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Material prices retrieved successfully",
+		"data":    response,
+	})
+}
+
+func (h *MaterialHandler) UpdateEstimatedPrice(c *fiber.Ctx) error {
+	boqID, err := uuid.Parse(c.Params("boqId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid BOQ ID",
+		})
+	}
+
+	var req requests.UpdateMaterialEstimatedPriceRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if err := h.materialUsecase.UpdateEstimatedPrice(c.Context(), boqID, req); err != nil {
+		switch err.Error() {
+		case "can only update estimated prices for BOQ in draft status":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		case "estimated price must be greater than 0":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update estimated price",
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Estimated price updated successfully",
+	})
+}
+
+func (h *MaterialHandler) UpdateActualPrice(c *fiber.Ctx) error {
+	boqID, err := uuid.Parse(c.Params("boqId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid BOQ ID",
+		})
+	}
+
+	var req requests.UpdateMaterialActualPriceRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if err := h.materialUsecase.UpdateActualPrice(c.Context(), boqID, req); err != nil {
+		switch err.Error() {
+		case "can only update actual prices for approved BOQ":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		case "cannot update actual prices for completed projects":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		case "can only update actual prices when quotation is approved":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		case "actual price must be greater than 0":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Actual price updated successfully",
 	})
 }
