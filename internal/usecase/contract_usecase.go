@@ -6,6 +6,7 @@ import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -33,85 +34,18 @@ func NewContractUsecase(
 		projectRepo:  projectRepo,
 	}
 }
-
 func (u *contractUseCase) Create(ctx context.Context, req *requests.CreateContractRequest) error {
-	// Get project details for any missing information
-	projectDetails, err := u.projectRepo.GetByID(ctx, req.ProjectID)
-	if err != nil {
-		return fmt.Errorf("failed to get project details: %w", err)
-	}
-
-	// Set default values for empty fields
-	projectDescription := req.ProjectDescription
-	if projectDescription == "" {
-		projectDescription = projectDetails.Description // Use project description as default
-	}
-
-	areaSize := req.AreaSize
-	if areaSize <= 0 {
-		areaSize = 0 // Default to 0 if not provided
-	}
-
-	startDate := req.StartDate
-	if startDate.IsZero() {
-		startDate = time.Now() // Use current time as default start date
-	}
-
-	endDate := req.EndDate
-	if endDate.IsZero() {
-		endDate = startDate.AddDate(1, 0, 0) // Default to 1 year from start date
-	}
-
-	guaranteeWithin := req.GuaranteeWithin
-	if guaranteeWithin <= 0 {
-		guaranteeWithin = 30 // Default 30 days
-	}
-
-	retentionMoney := 0.0
-
-	payWithin := req.PayWithin
-	if payWithin <= 0 {
-		payWithin = 30 // Default 30 days
-	}
-
-	validateWithin := req.ValidateWithin
-	if validateWithin <= 0 {
-		validateWithin = 7 // Default 7 days
-	}
-
-	format := req.Format
-	if len(format) == 0 {
-		format = []string{"pdf"} // Default format
-	}
-
-	// Create contract model with defaults
 	contract := &models.Contract{
-		ProjectID:           req.ProjectID,
-		ProjectDescription:  projectDescription,
-		AreaSize:            areaSize,
-		StartDate:           startDate,
-		EndDate:             endDate,
-		ForceMajeure:        req.ForceMajeure,
-		BreachOfContract:    req.BreachOfContract,
-		EndOfContract:       req.EndOfContract,
-		TerminationContract: req.TerminationContract,
-		Amendment:           req.Amendment,
-		GuaranteeWithin:     guaranteeWithin,
-		RetentionMoney:      retentionMoney,
-		PayWithin:           payWithin,
-		ValidateWithin:      validateWithin,
-		Format:              models.StringArray(format),
-		CreatedAt:           time.Now(),
-		UpdatedAt:           nil,
+		ProjectID: req.ProjectID,
 	}
 
-	// Create contract
 	if err := u.contractRepo.Create(ctx, contract); err != nil {
 		return fmt.Errorf("failed to create contract: %w", err)
 	}
 
 	return nil
 }
+
 func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *requests.UpdateContractRequest) error {
 	// Get existing contract
 	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
@@ -119,41 +53,107 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 		return err
 	}
 
-	// Update fields
+	// Update fields only if they are provided in the request
 	if req.ProjectDescription != "" {
-		contract.ProjectDescription = req.ProjectDescription
+		contract.ProjectDescription = sql.NullString{
+			String: req.ProjectDescription,
+			Valid:  true,
+		}
 	}
+
 	if req.AreaSize != 0 {
-		contract.AreaSize = req.AreaSize
+		contract.AreaSize = sql.NullFloat64{
+			Float64: req.AreaSize,
+			Valid:   true,
+		}
 	}
+
 	if !req.StartDate.IsZero() {
-		contract.StartDate = req.StartDate
+		contract.StartDate = sql.NullTime{
+			Time:  req.StartDate,
+			Valid: true,
+		}
 	}
+
 	if !req.EndDate.IsZero() {
-		contract.EndDate = req.EndDate
+		contract.EndDate = sql.NullTime{
+			Time:  req.EndDate,
+			Valid: true,
+		}
 	}
-	contract.ForceMajeure = req.ForceMajeure
-	contract.BreachOfContract = req.BreachOfContract
-	contract.EndOfContract = req.EndOfContract
-	contract.TerminationContract = req.TerminationContract
-	contract.Amendment = req.Amendment
-	if req.GuaranteeWithin != 0 {
-		contract.GuaranteeWithin = req.GuaranteeWithin
+
+	if req.ForceMajeure != "" {
+		contract.ForceMajeure = sql.NullString{
+			String: req.ForceMajeure,
+			Valid:  true,
+		}
 	}
-	if req.RetentionMoney != 0 {
-		contract.RetentionMoney = req.RetentionMoney
+
+	if req.BreachOfContract != "" {
+		contract.BreachOfContract = sql.NullString{
+			String: req.BreachOfContract,
+			Valid:  true,
+		}
 	}
-	if req.PayWithin != 0 {
-		contract.PayWithin = req.PayWithin
+
+	if req.EndOfContract != "" {
+		contract.EndOfContract = sql.NullString{
+			String: req.EndOfContract,
+			Valid:  true,
+		}
 	}
-	if req.ValidateWithin != 0 {
-		contract.ValidateWithin = req.ValidateWithin
+
+	if req.TerminationContract != "" {
+		contract.TerminationContract = sql.NullString{
+			String: req.TerminationContract,
+			Valid:  true,
+		}
 	}
+
+	if req.Amendment != "" {
+		contract.Amendment = sql.NullString{
+			String: req.Amendment,
+			Valid:  true,
+		}
+	}
+
+	if req.GuaranteeWithin > 0 {
+		contract.GuaranteeWithin = sql.NullInt32{
+			Int32: int32(req.GuaranteeWithin),
+			Valid: true,
+		}
+	}
+
+	if req.RetentionMoney > 0 {
+		contract.RetentionMoney = sql.NullFloat64{
+			Float64: req.RetentionMoney,
+			Valid:   true,
+		}
+	}
+
+	if req.PayWithin > 0 {
+		contract.PayWithin = sql.NullInt32{
+			Int32: int32(req.PayWithin),
+			Valid: true,
+		}
+	}
+
+	if req.ValidateWithin > 0 {
+		contract.ValidateWithin = sql.NullInt32{
+			Int32: int32(req.ValidateWithin),
+			Valid: true,
+		}
+	}
+
 	if len(req.Format) > 0 {
 		contract.Format = models.StringArray(req.Format)
 	}
+
 	now := time.Now()
-	contract.UpdatedAt = &now
+	contract.UpdatedAt = sql.NullTime{
+		Time:  now,
+		Valid: true,
+	}
 
 	// Update contract
 	if err := u.contractRepo.Update(ctx, contract); err != nil {
@@ -166,36 +166,66 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 func (u *contractUseCase) Delete(ctx context.Context, projectID uuid.UUID) error {
 	return u.contractRepo.Delete(ctx, projectID)
 }
-
 func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUID) (*responses.ContractResponse, error) {
 	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 
+	// Convert to response format
 	response := &responses.ContractResponse{
-		ContractID:          contract.ContractID,
-		ProjectID:           contract.ProjectID,
-		ProjectDescription:  contract.ProjectDescription,
-		AreaSize:            contract.AreaSize,
-		StartDate:           contract.StartDate,
-		EndDate:             contract.EndDate,
-		ForceMajeure:        contract.ForceMajeure,
-		BreachOfContract:    contract.BreachOfContract,
-		EndOfContract:       contract.EndOfContract,
-		TerminationContract: contract.TerminationContract,
-		Amendment:           contract.Amendment,
-		GuaranteeWithin:     contract.GuaranteeWithin,
-		RetentionMoney:      contract.RetentionMoney,
-		PayWithin:           contract.PayWithin,
-		ValidateWithin:      contract.ValidateWithin,
-		Format:              []string(contract.Format),
-		CreatedAt:           contract.CreatedAt,
-		UpdatedAt:           *contract.UpdatedAt,
-		Periods:             make([]responses.PeriodResponse, len(contract.Periods)),
+		ContractID: contract.ContractID,
+		ProjectID:  contract.ProjectID,
+		Format:     []string(contract.Format),
+		CreatedAt:  contract.CreatedAt,
 	}
 
-	// Map periods and jobs
+	// Handle nullable fields
+	if contract.ProjectDescription.Valid {
+		response.ProjectDescription = contract.ProjectDescription.String
+	}
+	if contract.AreaSize.Valid {
+		response.AreaSize = contract.AreaSize.Float64
+	}
+	if contract.StartDate.Valid {
+		response.StartDate = contract.StartDate.Time
+	}
+	if contract.EndDate.Valid {
+		response.EndDate = contract.EndDate.Time
+	}
+	if contract.ForceMajeure.Valid {
+		response.ForceMajeure = contract.ForceMajeure.String
+	}
+	if contract.BreachOfContract.Valid {
+		response.BreachOfContract = contract.BreachOfContract.String
+	}
+	if contract.EndOfContract.Valid {
+		response.EndOfContract = contract.EndOfContract.String
+	}
+	if contract.TerminationContract.Valid {
+		response.TerminationContract = contract.TerminationContract.String
+	}
+	if contract.Amendment.Valid {
+		response.Amendment = contract.Amendment.String
+	}
+	if contract.GuaranteeWithin.Valid {
+		response.GuaranteeWithin = int(contract.GuaranteeWithin.Int32)
+	}
+	if contract.RetentionMoney.Valid {
+		response.RetentionMoney = contract.RetentionMoney.Float64
+	}
+	if contract.PayWithin.Valid {
+		response.PayWithin = int(contract.PayWithin.Int32)
+	}
+	if contract.ValidateWithin.Valid {
+		response.ValidateWithin = int(contract.ValidateWithin.Int32)
+	}
+	if contract.UpdatedAt.Valid {
+		response.UpdatedAt = contract.UpdatedAt.Time
+	}
+
+	// Handle periods if they exist
+	response.Periods = make([]responses.PeriodResponse, len(contract.Periods))
 	for i, period := range contract.Periods {
 		periodResponse := responses.PeriodResponse{
 			PeriodID:        period.PeriodID,
@@ -209,7 +239,7 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 			periodResponse.Jobs[j] = responses.JobPeriodResponse{
 				JobID:     job.JobID,
 				JobAmount: job.JobAmount,
-				Job:       responses.JobResponse{}, // Map job details here
+				Job:       responses.JobResponse{}, // Map job details here if needed
 			}
 		}
 

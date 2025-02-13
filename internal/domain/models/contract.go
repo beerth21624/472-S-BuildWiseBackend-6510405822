@@ -1,9 +1,10 @@
 package models
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,36 +25,37 @@ func (a *StringArray) Scan(value interface{}) error {
 		return nil
 	}
 
-	b, ok := value.([]byte)
-	if !ok {
-		return errors.New("type assertion to []byte failed")
+	switch v := value.(type) {
+	case []byte:
+		return json.Unmarshal(v, a)
+	case string:
+		return json.Unmarshal([]byte(v), a)
+	default:
+		return fmt.Errorf("unsupported type for StringArray: %T", value)
 	}
-
-	return json.Unmarshal(b, a)
 }
 
 type Contract struct {
-	ContractID          uuid.UUID   `db:"contract_id"`
-	ProjectID           uuid.UUID   `db:"project_id"`
-	ProjectDescription  string      `db:"project_description"`
-	AreaSize            float64     `db:"area_size"`
-	StartDate           time.Time   `db:"start_date"`
-	EndDate             time.Time   `db:"end_date"`
-	ForceMajeure        string      `db:"force_majeure"`
-	BreachOfContract    string      `db:"breach_of_contract"`
-	EndOfContract       string      `db:"end_of_contract"`
-	TerminationContract string      `db:"termination_of_contract"`
-	Amendment           string      `db:"amendment"`
-	GuaranteeWithin     int         `db:"guarantee_within"`
-	RetentionMoney      float64     `db:"retention_money"`
-	PayWithin           int         `db:"pay_within"`
-	ValidateWithin      int         `db:"validate_within"`
-	Format              StringArray `db:"format"`
-	CreatedAt           time.Time   `db:"created_at"`
-	UpdatedAt           *time.Time  `db:"updated_at"`
-	Periods             []Period    `db:"-"`
+	ContractID          uuid.UUID       `db:"contract_id"`
+	ProjectID           uuid.UUID       `db:"project_id"`
+	ProjectDescription  sql.NullString  `db:"project_description"`
+	AreaSize            sql.NullFloat64 `db:"area_size"`
+	StartDate           sql.NullTime    `db:"start_date"`
+	EndDate             sql.NullTime    `db:"end_date"`
+	ForceMajeure        sql.NullString  `db:"force_majeure"`
+	BreachOfContract    sql.NullString  `db:"breach_of_contract"`
+	EndOfContract       sql.NullString  `db:"end_of_contract"`
+	TerminationContract sql.NullString  `db:"termination_of_contract"`
+	Amendment           sql.NullString  `db:"amendment"`
+	GuaranteeWithin     sql.NullInt32   `db:"guarantee_within"`
+	RetentionMoney      sql.NullFloat64 `db:"retention_money"`
+	PayWithin           sql.NullInt32   `db:"pay_within"`
+	ValidateWithin      sql.NullInt32   `db:"validate_within"`
+	Format              StringArray     `db:"format"`
+	CreatedAt           time.Time       `db:"created_at"`
+	UpdatedAt           sql.NullTime    `db:"updated_at"`
+	Periods             []Period        `db:"-"`
 }
-
 type Period struct {
 	PeriodID        uuid.UUID   `db:"period_id"`
 	ContractID      uuid.UUID   `db:"contract_id"`

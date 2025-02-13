@@ -1,6 +1,7 @@
 package responses
 
 import (
+	"boonkosang/internal/domain/models"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,4 +41,58 @@ type JobPeriodResponse struct {
 	JobID     uuid.UUID   `json:"job_id"`
 	JobAmount float64     `json:"job_amount"`
 	Job       JobResponse `json:"job"`
+}
+
+func ToContractResponse(c *models.Contract) *ContractResponse {
+	response := &ContractResponse{
+		ContractID: c.ContractID,
+		ProjectID:  c.ProjectID,
+		Format:     []string(c.Format),
+		CreatedAt:  c.CreatedAt,
+	}
+
+	if c.ProjectDescription.Valid {
+		response.ProjectDescription = c.ProjectDescription.String
+	}
+	if c.AreaSize.Valid {
+		response.AreaSize = c.AreaSize.Float64
+	}
+	if c.StartDate.Valid {
+		response.StartDate = c.StartDate.Time
+	}
+	if c.EndDate.Valid {
+		response.EndDate = c.EndDate.Time
+	}
+	if c.ForceMajeure.Valid {
+		response.ForceMajeure = c.ForceMajeure.String
+	}
+	if c.BreachOfContract.Valid {
+		response.BreachOfContract = c.BreachOfContract.String
+	}
+	if c.EndOfContract.Valid {
+		response.EndOfContract = c.EndOfContract.String
+	}
+	if c.TerminationContract.Valid {
+		response.TerminationContract = c.TerminationContract.String
+	}
+	if c.Amendment.Valid {
+		response.Amendment = c.Amendment.String
+	}
+	if c.GuaranteeWithin.Valid {
+		response.GuaranteeWithin = int(c.GuaranteeWithin.Int32)
+	}
+	if c.RetentionMoney.Valid {
+		response.RetentionMoney = c.RetentionMoney.Float64
+	}
+	if c.PayWithin.Valid {
+		response.PayWithin = int(c.PayWithin.Int32)
+	}
+	if c.ValidateWithin.Valid {
+		response.ValidateWithin = int(c.ValidateWithin.Int32)
+	}
+	if c.UpdatedAt.Valid {
+		response.UpdatedAt = c.UpdatedAt.Time
+	}
+
+	return response
 }
