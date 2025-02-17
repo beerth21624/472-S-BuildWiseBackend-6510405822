@@ -57,6 +57,7 @@ func (r *contractRepository) Create(ctx context.Context, contract *models.Contra
 
 	return nil
 }
+
 func (r *contractRepository) Update(ctx context.Context, contract *models.Contract) error {
 	// Build dynamic query and params based on which fields are being updated
 	var setFields []string
@@ -70,7 +71,6 @@ func (r *contractRepository) Update(ctx context.Context, contract *models.Contra
 		}
 	}
 
-	// Add all fields that should be updated
 	addField("project_description", "project_description", contract.ProjectDescription.String, contract.ProjectDescription.Valid)
 	addField("area_size", "area_size", contract.AreaSize.Float64, contract.AreaSize.Valid)
 	addField("start_date", "start_date", contract.StartDate.Time, contract.StartDate.Valid)

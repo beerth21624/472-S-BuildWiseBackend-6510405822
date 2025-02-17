@@ -56,6 +56,13 @@ type Contract struct {
 	UpdatedAt           sql.NullTime    `db:"updated_at"`
 	Periods             []Period        `db:"-"`
 }
+type JobPeriod struct {
+	JobID     uuid.UUID `db:"job_id"`
+	PeriodID  uuid.UUID `db:"period_id"`
+	JobAmount float64   `db:"job_amount"`
+	JobDetail Job       `db:"-"`
+}
+
 type Period struct {
 	PeriodID        uuid.UUID   `db:"period_id"`
 	ContractID      uuid.UUID   `db:"contract_id"`
@@ -63,11 +70,4 @@ type Period struct {
 	AmountPeriod    float64     `db:"amount_period"`
 	DeliveredWithin int         `db:"delivered_within"`
 	Jobs            []JobPeriod `db:"-"`
-}
-
-type JobPeriod struct {
-	JobID     uuid.UUID `db:"job_id"`
-	PeriodID  uuid.UUID `db:"period_id"`
-	JobAmount float64   `db:"job_amount"`
-	Job       Job       `db:"-"`
 }

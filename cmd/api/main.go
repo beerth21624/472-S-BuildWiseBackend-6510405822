@@ -94,7 +94,8 @@ func main() {
 	CompanyHandler.CompanyRoutes(app)
 
 	contractRepo := postgres.NewContractRepository(db)
-	contractUseCase := usecase.NewContractUsecase(contractRepo, projectRepo)
+	periodRepo := postgres.NewPeriodRepository(db)
+	contractUseCase := usecase.NewContractUsecase(contractRepo, periodRepo, projectRepo)
 	ContractHandler := rest.NewContractHandler(contractUseCase)
 	ContractHandler.ContractRoutes(app)
 

@@ -8,7 +8,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -22,30 +21,109 @@ type ContractUseCase interface {
 
 type contractUseCase struct {
 	contractRepo repositories.ContractRepository
+	periodRepo   repositories.PeriodRepository
 	projectRepo  repositories.ProjectRepository
 }
 
 func NewContractUsecase(
 	contractRepo repositories.ContractRepository,
+	periodRepo repositories.PeriodRepository,
 	projectRepo repositories.ProjectRepository,
 ) ContractUseCase {
 	return &contractUseCase{
 		contractRepo: contractRepo,
+		periodRepo:   periodRepo,
 		projectRepo:  projectRepo,
 	}
 }
+
 func (u *contractUseCase) Create(ctx context.Context, req *requests.CreateContractRequest) error {
+	// Create the contract first
 	contract := &models.Contract{
 		ProjectID: req.ProjectID,
+		ProjectDescription: sql.NullString{
+			String: req.ProjectDescription,
+			Valid:  req.ProjectDescription != "",
+		},
+		AreaSize: sql.NullFloat64{
+			Float64: req.AreaSize,
+			Valid:   req.AreaSize != 0,
+		},
+		StartDate: sql.NullTime{
+			Time:  req.StartDate,
+			Valid: !req.StartDate.IsZero(),
+		},
+		EndDate: sql.NullTime{
+			Time:  req.EndDate,
+			Valid: !req.EndDate.IsZero(),
+		},
+		ForceMajeure: sql.NullString{
+			String: req.ForceMajeure,
+			Valid:  req.ForceMajeure != "",
+		},
+		BreachOfContract: sql.NullString{
+			String: req.BreachOfContract,
+			Valid:  req.BreachOfContract != "",
+		},
+		EndOfContract: sql.NullString{
+			String: req.EndOfContract,
+			Valid:  req.EndOfContract != "",
+		},
+		TerminationContract: sql.NullString{
+			String: req.TerminationContract,
+			Valid:  req.TerminationContract != "",
+		},
+		Amendment: sql.NullString{
+			String: req.Amendment,
+			Valid:  req.Amendment != "",
+		},
+		GuaranteeWithin: sql.NullInt32{
+			Int32: int32(req.GuaranteeWithin),
+			Valid: req.GuaranteeWithin != 0,
+		},
+		RetentionMoney: sql.NullFloat64{
+			Float64: req.RetentionMoney,
+			Valid:   req.RetentionMoney != 0,
+		},
+		PayWithin: sql.NullInt32{
+			Int32: int32(req.PayWithin),
+			Valid: req.PayWithin != 0,
+		},
+		ValidateWithin: sql.NullInt32{
+			Int32: int32(req.ValidateWithin),
+			Valid: req.ValidateWithin != 0,
+		},
+		Format: models.StringArray(req.Format),
 	}
 
 	if err := u.contractRepo.Create(ctx, contract); err != nil {
 		return fmt.Errorf("failed to create contract: %w", err)
 	}
 
+	for _, periodReq := range req.Periods {
+		period := &models.Period{
+			ContractID:      contract.ContractID,
+			PeriodNumber:    periodReq.PeriodNumber,
+			AmountPeriod:    periodReq.AmountPeriod,
+			DeliveredWithin: periodReq.DeliveredWithin,
+			Jobs:            make([]models.JobPeriod, len(periodReq.Jobs)),
+		}
+
+		// Convert job requests to job periods
+		for i, jobReq := range periodReq.Jobs {
+			period.Jobs[i] = models.JobPeriod{
+				JobID:     jobReq.JobID,
+				JobAmount: jobReq.JobAmount,
+			}
+		}
+
+		if err := u.periodRepo.CreatePeriod(ctx, contract.ContractID, period); err != nil {
+			return fmt.Errorf("failed to create period: %w", err)
+		}
+	}
+
 	return nil
 }
-
 func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *requests.UpdateContractRequest) error {
 	// Get existing contract
 	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
@@ -53,7 +131,7 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 		return err
 	}
 
-	// Update fields only if they are provided in the request
+	// Update basic contract fields
 	if req.ProjectDescription != "" {
 		contract.ProjectDescription = sql.NullString{
 			String: req.ProjectDescription,
@@ -149,28 +227,119 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 		contract.Format = models.StringArray(req.Format)
 	}
 
-	now := time.Now()
-	contract.UpdatedAt = sql.NullTime{
-		Time:  now,
-		Valid: true,
-	}
-
-	// Update contract
 	if err := u.contractRepo.Update(ctx, contract); err != nil {
 		return err
+	}
+
+	if len(req.Periods) > 0 {
+		existingPeriods, err := u.periodRepo.GetPeriodsByContractID(ctx, contract.ContractID)
+		if err != nil {
+			return fmt.Errorf("failed to get existing periods: %w", err)
+		}
+
+		existingPeriodMap := make(map[int]models.Period)
+		for _, p := range existingPeriods {
+			existingPeriodMap[p.PeriodNumber] = p
+		}
+
+		for _, periodReq := range req.Periods {
+			if existingPeriod, exists := existingPeriodMap[periodReq.PeriodNumber]; exists {
+				// Update existing period
+				period := &models.Period{
+					PeriodID:        existingPeriod.PeriodID,
+					ContractID:      contract.ContractID,
+					PeriodNumber:    periodReq.PeriodNumber,
+					AmountPeriod:    periodReq.AmountPeriod,
+					DeliveredWithin: periodReq.DeliveredWithin,
+				}
+
+				// Update period jobs
+				for _, jobReq := range periodReq.Jobs {
+					// Find if job already exists in period
+					var existingJob *models.JobPeriod
+					for _, j := range existingPeriod.Jobs {
+						if j.JobID == jobReq.JobID {
+							existingJob = &j
+							break
+						}
+					}
+
+					if existingJob != nil {
+						// Update existing job
+						jobPeriod := models.JobPeriod{
+							JobID:     jobReq.JobID,
+							PeriodID:  period.PeriodID,
+							JobAmount: jobReq.JobAmount,
+						}
+						period.Jobs = append(period.Jobs, jobPeriod)
+					} else {
+						// Add new job to period
+						jobPeriod := models.JobPeriod{
+							JobID:     jobReq.JobID,
+							PeriodID:  period.PeriodID,
+							JobAmount: jobReq.JobAmount,
+						}
+						period.Jobs = append(period.Jobs, jobPeriod)
+					}
+				}
+
+				// Update period in database
+				if err := u.periodRepo.UpdatePeriod(ctx, period); err != nil {
+					return fmt.Errorf("failed to update period %d: %w", periodReq.PeriodNumber, err)
+				}
+			} else {
+				// Create new period
+				newPeriod := &models.Period{
+					ContractID:      contract.ContractID,
+					PeriodNumber:    periodReq.PeriodNumber,
+					AmountPeriod:    periodReq.AmountPeriod,
+					DeliveredWithin: periodReq.DeliveredWithin,
+				}
+
+				// Add jobs to new period
+				for _, jobReq := range periodReq.Jobs {
+					jobPeriod := models.JobPeriod{
+						JobID:     jobReq.JobID,
+						JobAmount: jobReq.JobAmount,
+					}
+					newPeriod.Jobs = append(newPeriod.Jobs, jobPeriod)
+				}
+
+				// Create new period in database
+				if err := u.periodRepo.CreatePeriod(ctx, contract.ContractID, newPeriod); err != nil {
+					return fmt.Errorf("failed to create new period %d: %w", periodReq.PeriodNumber, err)
+				}
+			}
+		}
 	}
 
 	return nil
 }
 
 func (u *contractUseCase) Delete(ctx context.Context, projectID uuid.UUID) error {
+	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
+	if err != nil {
+		return err
+	}
+
+	if err := u.periodRepo.DeletePeriodsByContractID(ctx, contract.ContractID); err != nil {
+		return fmt.Errorf("failed to delete periods: %w", err)
+	}
 	return u.contractRepo.Delete(ctx, projectID)
 }
 func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUID) (*responses.ContractResponse, error) {
+	// Get contract
 	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
+
+	// Get periods for the contract
+	periods, err := u.periodRepo.GetPeriodsByContractID(ctx, contract.ContractID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get periods: %w", err)
+	}
+	contract.Periods = periods
 
 	// Convert to response format
 	response := &responses.ContractResponse{
@@ -224,7 +393,7 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 		response.UpdatedAt = contract.UpdatedAt.Time
 	}
 
-	// Handle periods if they exist
+	// Handle periods and their jobs
 	response.Periods = make([]responses.PeriodResponse, len(contract.Periods))
 	for i, period := range contract.Periods {
 		periodResponse := responses.PeriodResponse{
@@ -235,11 +404,16 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 			Jobs:            make([]responses.JobPeriodResponse, len(period.Jobs)),
 		}
 
-		for j, job := range period.Jobs {
+		for j, jobPeriod := range period.Jobs {
 			periodResponse.Jobs[j] = responses.JobPeriodResponse{
-				JobID:     job.JobID,
-				JobAmount: job.JobAmount,
-				Job:       responses.JobResponse{}, // Map job details here if needed
+				JobID:     jobPeriod.JobID,
+				JobAmount: jobPeriod.JobAmount,
+				Job: responses.JobResponse{
+					JobID:       jobPeriod.JobDetail.JobID,
+					Name:        jobPeriod.JobDetail.Name,
+					Description: jobPeriod.JobDetail.Description.String,
+					Unit:        jobPeriod.JobDetail.Unit,
+				},
 			}
 		}
 
@@ -248,7 +422,6 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 
 	return response, nil
 }
-
 func calculateRetentionMoney(jobs []models.QuotationJob) float64 {
 	var total float64
 	for _, job := range jobs {

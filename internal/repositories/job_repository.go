@@ -14,6 +14,7 @@ type JobRepository interface {
 	Update(ctx context.Context, id uuid.UUID, req requests.UpdateJobRequest) error
 	List(ctx context.Context) (*responses.JobListResponse, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Job, error)
+	GetJobsByIDs(ctx context.Context, ids []uuid.UUID) ([]models.Job, error)
 	GetJobMaterialByID(ctx context.Context, id uuid.UUID) (responses.JobMaterialResponse, error)
 	Delete(ctx context.Context, jobID uuid.UUID) error
 

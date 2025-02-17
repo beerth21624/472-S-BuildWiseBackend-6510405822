@@ -36,6 +36,20 @@ func (r *jobRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Job,
 	return &job, nil
 }
 
+func (r *jobRepository) GetJobsByIDs(ctx context.Context, ids []uuid.UUID) ([]models.Job, error) {
+	var jobs []models.Job
+	query, args, err := sqlx.In(`SELECT * FROM Job WHERE job_id IN (?)`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare query: %w", err)
+	}
+	query = r.db.Rebind(query)
+	err = r.db.SelectContext(ctx, &jobs, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jobs by IDs: %w", err)
+	}
+	return jobs, nil
+}
+
 func (r *jobRepository) GetJobMaterialByID(ctx context.Context, id uuid.UUID) (responses.JobMaterialResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {

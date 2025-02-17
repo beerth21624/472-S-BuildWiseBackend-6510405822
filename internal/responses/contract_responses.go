@@ -40,7 +40,7 @@ type PeriodResponse struct {
 type JobPeriodResponse struct {
 	JobID     uuid.UUID   `json:"job_id"`
 	JobAmount float64     `json:"job_amount"`
-	Job       JobResponse `json:"job"`
+	Job       JobResponse `json:"job_detail"`
 }
 
 func ToContractResponse(c *models.Contract) *ContractResponse {
