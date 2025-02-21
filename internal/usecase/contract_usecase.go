@@ -244,7 +244,6 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 
 		for _, periodReq := range req.Periods {
 			if existingPeriod, exists := existingPeriodMap[periodReq.PeriodNumber]; exists {
-				// Update existing period
 				period := &models.Period{
 					PeriodID:        existingPeriod.PeriodID,
 					ContractID:      contract.ContractID,
@@ -253,7 +252,6 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 					DeliveredWithin: periodReq.DeliveredWithin,
 				}
 
-				// Update period jobs
 				for _, jobReq := range periodReq.Jobs {
 					// Find if job already exists in period
 					var existingJob *models.JobPeriod
@@ -265,7 +263,6 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 					}
 
 					if existingJob != nil {
-						// Update existing job
 						jobPeriod := models.JobPeriod{
 							JobID:     jobReq.JobID,
 							PeriodID:  period.PeriodID,
@@ -273,7 +270,6 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 						}
 						period.Jobs = append(period.Jobs, jobPeriod)
 					} else {
-						// Add new job to period
 						jobPeriod := models.JobPeriod{
 							JobID:     jobReq.JobID,
 							PeriodID:  period.PeriodID,
@@ -283,12 +279,10 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 					}
 				}
 
-				// Update period in database
 				if err := u.periodRepo.UpdatePeriod(ctx, period); err != nil {
 					return fmt.Errorf("failed to update period %d: %w", periodReq.PeriodNumber, err)
 				}
 			} else {
-				// Create new period
 				newPeriod := &models.Period{
 					ContractID:      contract.ContractID,
 					PeriodNumber:    periodReq.PeriodNumber,
@@ -296,7 +290,6 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 					DeliveredWithin: periodReq.DeliveredWithin,
 				}
 
-				// Add jobs to new period
 				for _, jobReq := range periodReq.Jobs {
 					jobPeriod := models.JobPeriod{
 						JobID:     jobReq.JobID,
@@ -305,7 +298,6 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 					newPeriod.Jobs = append(newPeriod.Jobs, jobPeriod)
 				}
 
-				// Create new period in database
 				if err := u.periodRepo.CreatePeriod(ctx, contract.ContractID, newPeriod); err != nil {
 					return fmt.Errorf("failed to create new period %d: %w", periodReq.PeriodNumber, err)
 				}

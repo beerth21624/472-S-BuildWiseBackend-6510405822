@@ -23,6 +23,7 @@ func (h *JobHandler) JobRoutes(app *fiber.App) {
 
 	job.Get("/", h.List)
 	job.Post("/", h.Create)
+	job.Get("/project/:id", h.GetByProjectID)
 	job.Get("/:id", h.GetByID)
 	job.Put("/:id", h.Update)
 	job.Delete("/:id", h.Delete)
@@ -85,6 +86,27 @@ func (h *JobHandler) GetByID(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Job retrieved successfully",
 		"data":    job,
+	})
+}
+
+func (h *JobHandler) GetByProjectID(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	jobs, err := h.jobUsecase.GetJobByProjectID(c.Context(), id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to retrieve jobs",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Jobs retrieved successfully",
+		"data":    jobs,
 	})
 }
 

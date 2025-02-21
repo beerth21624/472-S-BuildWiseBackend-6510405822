@@ -21,4 +21,5 @@ type JobRepository interface {
 	AddJobMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error
 	DeleteJobMaterial(ctx context.Context, jobID uuid.UUID, materialID string) error
 	UpdateJobMaterialQuantity(ctx context.Context, jobID uuid.UUID, req requests.UpdateJobMaterialQuantityRequest) error
+	GetJobByProjectID(ctx context.Context, projectID uuid.UUID) ([]responses.JobResponse, error)
 }

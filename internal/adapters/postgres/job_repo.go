@@ -466,3 +466,21 @@ type UpdateJobMaterialQuantityRequest struct {
 	MaterialID uuid.UUID `json:"material_id" validate:"required"`
 	Quantity   int       `json:"quantity" validate:"required,gt=0"`
 }
+
+func (r *jobRepository) GetJobByProjectID(ctx context.Context, projectID uuid.UUID) ([]responses.JobResponse, error) {
+	query := `
+		SELECT DISTINCT j.job_id, j.name, j.description, j.unit, bj.quantity, bj.labor_cost
+		FROM job j
+		INNER JOIN boq_job bj ON j.job_id = bj.job_id
+		INNER JOIN boq b ON bj.boq_id = b.boq_id
+		WHERE b.project_id = $1
+	`
+
+	var jobs []responses.JobResponse
+	err := r.db.SelectContext(ctx, &jobs, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jobs by project ID: %w", err)
+	}
+
+	return jobs, nil
+}
