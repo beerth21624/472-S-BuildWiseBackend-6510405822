@@ -14,4 +14,6 @@ type ContractRepository interface {
 	Delete(ctx context.Context, projectID uuid.UUID) error
 	GetByProjectID(ctx context.Context, projectID uuid.UUID) (*models.Contract, error)
 	ValidateProjectStatus(ctx context.Context, projectID uuid.UUID) error
+
+	ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error
 }

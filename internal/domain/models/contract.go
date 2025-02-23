@@ -51,6 +51,7 @@ type Contract struct {
 	RetentionMoney      sql.NullFloat64 `db:"retention_money"`
 	PayWithin           sql.NullInt32   `db:"pay_within"`
 	ValidateWithin      sql.NullInt32   `db:"validate_within"`
+	Status              sql.NullString  `db:"status"`
 	Format              StringArray     `db:"format"`
 	CreatedAt           time.Time       `db:"created_at"`
 	UpdatedAt           sql.NullTime    `db:"updated_at"`

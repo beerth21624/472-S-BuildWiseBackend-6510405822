@@ -24,6 +24,7 @@ type ContractResponse struct {
 	PayWithin           int              `json:"pay_within"`
 	ValidateWithin      int              `json:"validate_within"`
 	Format              []string         `json:"format"`
+	Status              string           `json:"status"`
 	CreatedAt           time.Time        `json:"created_at"`
 	UpdatedAt           time.Time        `json:"updated_at"`
 	Periods             []PeriodResponse `json:"periods"`

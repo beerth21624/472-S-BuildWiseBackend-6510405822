@@ -30,11 +30,13 @@ func (r *contractRepository) Create(ctx context.Context, contract *models.Contra
 			contract_id, 
 			project_id, 
 			format,
+			status,
 			created_at
 		) VALUES (
 			:contract_id, 
 			:project_id, 
 			:format,
+			:status,
 			:created_at
 		)`
 
@@ -47,6 +49,7 @@ func (r *contractRepository) Create(ctx context.Context, contract *models.Contra
 		"contract_id": uuid.New(),
 		"project_id":  contract.ProjectID,
 		"format":      string(formatJSON),
+		"status":      "draft",
 		"created_at":  time.Now(),
 	}
 
@@ -84,6 +87,7 @@ func (r *contractRepository) Update(ctx context.Context, contract *models.Contra
 	addField("retention_money", "retention_money", contract.RetentionMoney.Float64, contract.RetentionMoney.Valid)
 	addField("pay_within", "pay_within", contract.PayWithin.Int32, contract.PayWithin.Valid)
 	addField("validate_within", "validate_within", contract.ValidateWithin.Int32, contract.ValidateWithin.Valid)
+	addField("status", "status", contract.Status.String, contract.Status.Valid)
 
 	// Handle format field specially
 	if len(contract.Format) > 0 {
@@ -181,6 +185,15 @@ func (r *contractRepository) ValidateProjectStatus(ctx context.Context, projectI
 	}
 	if !exists {
 		return errors.New("project does not exist")
+	}
+	return nil
+}
+
+func (r *contractRepository) ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error {
+	query := `UPDATE contract SET status = $1 WHERE project_id = $2`
+	_, err := r.db.ExecContext(ctx, query, status, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to update contract status: %w", err)
 	}
 	return nil
 }

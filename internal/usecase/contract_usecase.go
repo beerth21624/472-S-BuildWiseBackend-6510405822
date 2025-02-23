@@ -17,23 +17,27 @@ type ContractUseCase interface {
 	Update(ctx context.Context, projectID uuid.UUID, req *requests.UpdateContractRequest) error
 	Delete(ctx context.Context, projectID uuid.UUID) error
 	GetByProjectID(ctx context.Context, projectID uuid.UUID) (*responses.ContractResponse, error)
+	ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error
 }
 
 type contractUseCase struct {
-	contractRepo repositories.ContractRepository
-	periodRepo   repositories.PeriodRepository
-	projectRepo  repositories.ProjectRepository
+	contractRepo  repositories.ContractRepository
+	periodRepo    repositories.PeriodRepository
+	projectRepo   repositories.ProjectRepository
+	quotationRepo repositories.QuotationRepository
 }
 
 func NewContractUsecase(
 	contractRepo repositories.ContractRepository,
 	periodRepo repositories.PeriodRepository,
 	projectRepo repositories.ProjectRepository,
+	quotationRepo repositories.QuotationRepository,
 ) ContractUseCase {
 	return &contractUseCase{
-		contractRepo: contractRepo,
-		periodRepo:   periodRepo,
-		projectRepo:  projectRepo,
+		contractRepo:  contractRepo,
+		periodRepo:    periodRepo,
+		projectRepo:   projectRepo,
+		quotationRepo: quotationRepo,
 	}
 }
 
@@ -378,6 +382,9 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 	if contract.PayWithin.Valid {
 		response.PayWithin = int(contract.PayWithin.Int32)
 	}
+	if contract.Status.Valid {
+		response.Status = contract.Status.String
+	}
 	if contract.ValidateWithin.Valid {
 		response.ValidateWithin = int(contract.ValidateWithin.Int32)
 	}
@@ -422,4 +429,86 @@ func calculateRetentionMoney(jobs []models.QuotationJob) float64 {
 		}
 	}
 	return total * 0.05 // 5% retention
+}
+
+func (u *contractUseCase) ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error {
+	//contractRepo.ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error
+
+	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
+	if err != nil {
+
+		return fmt.Errorf("failed to get contract: %w", err)
+	}
+
+	//validate every filled in contract is not empty
+	if contract.ProjectDescription.String == "" {
+		return fmt.Errorf("project description is empty")
+	}
+	if contract.AreaSize.Float64 == 0 {
+		return fmt.Errorf("area size is empty")
+	}
+	if contract.StartDate.Time.IsZero() {
+		return fmt.Errorf("start date is empty")
+	}
+	if contract.EndDate.Time.IsZero() {
+		return fmt.Errorf("end date is empty")
+	}
+	if contract.ForceMajeure.String == "" {
+		return fmt.Errorf("force majeure is empty")
+	}
+	if contract.BreachOfContract.String == "" {
+		return fmt.Errorf("breach of contract is empty")
+	}
+	if contract.EndOfContract.String == "" {
+		return fmt.Errorf("end of contract is empty")
+	}
+	if contract.TerminationContract.String == "" {
+		return fmt.Errorf("termination contract is empty")
+	}
+	if contract.Amendment.String == "" {
+		return fmt.Errorf("amendment is empty")
+	}
+	if contract.GuaranteeWithin.Int32 == 0 {
+		return fmt.Errorf("guarantee within is empty")
+	}
+	if contract.RetentionMoney.Float64 == 0 {
+		return fmt.Errorf("retention money is empty")
+	}
+	if contract.PayWithin.Int32 == 0 {
+		return fmt.Errorf("pay within is empty")
+	}
+	if contract.ValidateWithin.Int32 == 0 {
+		return fmt.Errorf("validate within is empty")
+	}
+	if len(contract.Format) == 0 {
+		return fmt.Errorf("format is empty")
+	}
+
+	quotation, err := u.quotationRepo.GetByProjectID(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to get quotation: %w", err)
+	}
+	if quotation == nil {
+		return fmt.Errorf("quotation not found")
+	}
+
+	var final_amount float64
+	if quotation.FinalAmount.Valid {
+		final_amount = quotation.FinalAmount.Float64
+	}
+
+	var sum_amount_period float64
+	for _, period := range contract.Periods {
+		sum_amount_period += period.AmountPeriod
+	}
+	if sum_amount_period != final_amount {
+		return fmt.Errorf("sum amount period is not equal to final amount in quotation")
+	}
+
+	if status == "approved" {
+		u.contractRepo.ChangeStatus(ctx, projectID, status)
+	}
+
+	return nil
+
 }
