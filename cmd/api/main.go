@@ -96,7 +96,7 @@ func main() {
 	contractRepo := postgres.NewContractRepository(db)
 	quotationRepo := postgres.NewQuotationRepository(db)
 	periodRepo := postgres.NewPeriodRepository(db)
-	contractUseCase := usecase.NewContractUsecase(contractRepo, periodRepo, projectRepo, quotationRepo)
+	contractUseCase := usecase.NewContractUsecase(contractRepo, periodRepo, projectRepo, quotationRepo, jobRepo)
 	ContractHandler := rest.NewContractHandler(contractUseCase)
 	ContractHandler.ContractRoutes(app)
 

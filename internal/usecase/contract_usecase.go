@@ -25,6 +25,7 @@ type contractUseCase struct {
 	periodRepo    repositories.PeriodRepository
 	projectRepo   repositories.ProjectRepository
 	quotationRepo repositories.QuotationRepository
+	jobRepo       repositories.JobRepository
 }
 
 func NewContractUsecase(
@@ -32,12 +33,14 @@ func NewContractUsecase(
 	periodRepo repositories.PeriodRepository,
 	projectRepo repositories.ProjectRepository,
 	quotationRepo repositories.QuotationRepository,
+	jobRepo repositories.JobRepository,
 ) ContractUseCase {
 	return &contractUseCase{
 		contractRepo:  contractRepo,
 		periodRepo:    periodRepo,
 		projectRepo:   projectRepo,
 		quotationRepo: quotationRepo,
+		jobRepo:       jobRepo,
 	}
 }
 
@@ -227,91 +230,69 @@ func (u *contractUseCase) Update(ctx context.Context, projectID uuid.UUID, req *
 		}
 	}
 
+	// Validate that the total job amount in periods matches the project job quantities
+	allJobInProject, err := u.jobRepo.GetJobByProjectID(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to get job by project id: %w", err)
+	}
+
+	for _, j := range allJobInProject {
+		var jobAmount float64
+		for _, period := range req.Periods {
+			for _, job := range period.Jobs {
+				if j.JobID == job.JobID {
+					jobAmount += job.JobAmount
+				}
+			}
+		}
+		if jobAmount != j.Quantity {
+			return fmt.Errorf("job amount in period is not equal to job in project")
+		}
+	}
+
 	if len(req.Format) > 0 {
 		contract.Format = models.StringArray(req.Format)
 	}
 
+	// Update contract base information
 	if err := u.contractRepo.Update(ctx, contract); err != nil {
 		return err
 	}
 
+	// Handle periods - Option 1: Delete and recreate all periods
 	if len(req.Periods) > 0 {
-		existingPeriods, err := u.periodRepo.GetPeriodsByContractID(ctx, contract.ContractID)
-		if err != nil {
-			return fmt.Errorf("failed to get existing periods: %w", err)
+		// Delete all existing periods for this contract
+		if err := u.periodRepo.DeletePeriodsByContractID(ctx, contract.ContractID); err != nil {
+			return fmt.Errorf("failed to delete existing periods: %w", err)
 		}
 
-		existingPeriodMap := make(map[int]models.Period)
-		for _, p := range existingPeriods {
-			existingPeriodMap[p.PeriodNumber] = p
-		}
-
+		// Create all periods from the request
 		for _, periodReq := range req.Periods {
-			if existingPeriod, exists := existingPeriodMap[periodReq.PeriodNumber]; exists {
-				period := &models.Period{
-					PeriodID:        existingPeriod.PeriodID,
-					ContractID:      contract.ContractID,
-					PeriodNumber:    periodReq.PeriodNumber,
-					AmountPeriod:    periodReq.AmountPeriod,
-					DeliveredWithin: periodReq.DeliveredWithin,
-				}
+			newPeriod := &models.Period{
+				ContractID:      contract.ContractID,
+				PeriodNumber:    periodReq.PeriodNumber,
+				AmountPeriod:    periodReq.AmountPeriod,
+				DeliveredWithin: periodReq.DeliveredWithin,
+				Jobs:            make([]models.JobPeriod, len(periodReq.Jobs)),
+			}
 
-				for _, jobReq := range periodReq.Jobs {
-					// Find if job already exists in period
-					var existingJob *models.JobPeriod
-					for _, j := range existingPeriod.Jobs {
-						if j.JobID == jobReq.JobID {
-							existingJob = &j
-							break
-						}
-					}
+			// Add all jobs for this period
+			for i, jobReq := range periodReq.Jobs {
+				newPeriod.Jobs[i] = models.JobPeriod{
+					JobID:     jobReq.JobID,
+					JobAmount: jobReq.JobAmount,
+				}
+			}
 
-					if existingJob != nil {
-						jobPeriod := models.JobPeriod{
-							JobID:     jobReq.JobID,
-							PeriodID:  period.PeriodID,
-							JobAmount: jobReq.JobAmount,
-						}
-						period.Jobs = append(period.Jobs, jobPeriod)
-					} else {
-						jobPeriod := models.JobPeriod{
-							JobID:     jobReq.JobID,
-							PeriodID:  period.PeriodID,
-							JobAmount: jobReq.JobAmount,
-						}
-						period.Jobs = append(period.Jobs, jobPeriod)
-					}
-				}
-
-				if err := u.periodRepo.UpdatePeriod(ctx, period); err != nil {
-					return fmt.Errorf("failed to update period %d: %w", periodReq.PeriodNumber, err)
-				}
-			} else {
-				newPeriod := &models.Period{
-					ContractID:      contract.ContractID,
-					PeriodNumber:    periodReq.PeriodNumber,
-					AmountPeriod:    periodReq.AmountPeriod,
-					DeliveredWithin: periodReq.DeliveredWithin,
-				}
-
-				for _, jobReq := range periodReq.Jobs {
-					jobPeriod := models.JobPeriod{
-						JobID:     jobReq.JobID,
-						JobAmount: jobReq.JobAmount,
-					}
-					newPeriod.Jobs = append(newPeriod.Jobs, jobPeriod)
-				}
-
-				if err := u.periodRepo.CreatePeriod(ctx, contract.ContractID, newPeriod); err != nil {
-					return fmt.Errorf("failed to create new period %d: %w", periodReq.PeriodNumber, err)
-				}
+			// Create the new period
+			if err := u.periodRepo.CreatePeriod(ctx, contract.ContractID, newPeriod); err != nil {
+				return fmt.Errorf("failed to create period %d: %w", periodReq.PeriodNumber, err)
 			}
 		}
 	}
 
 	return nil
 }
-
 func (u *contractUseCase) Delete(ctx context.Context, projectID uuid.UUID) error {
 	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
 	if err != nil {
