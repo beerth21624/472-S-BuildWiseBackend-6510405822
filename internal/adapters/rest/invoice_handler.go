@@ -19,66 +19,15 @@ func NewInvoiceHandler(invoiceUseCase usecase.InvoiceUseCase) *InvoiceHandler {
 }
 
 func (h *InvoiceHandler) InvoiceRoutes(app *fiber.App) {
+	// Project-specific invoice routes
 	invoice := app.Group("/invoices/:projectId")
-	invoice.Post("/", h.CreateInvoice)
-	invoice.Delete("/:invoiceId", h.DeleteInvoice)
+	invoice.Post("/all-periods", h.CreateInvoicesForAllPeriods)
 	invoice.Get("/", h.GetProjectInvoices)
-}
 
-func (h *InvoiceHandler) CreateInvoice(c *fiber.Ctx) error {
-	projectID, err := uuid.Parse(c.Params("projectId"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid project ID",
-		})
-	}
+	invoiceDetail := app.Group("/invoice")
+	invoiceDetail.Get("/:invoiceId", h.GetInvoiceByID)
+	invoiceDetail.Put("/:invoiceId/status", h.UpdateInvoiceStatus)
 
-	var req requests.CreateInvoiceRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
-	if err := h.invoiceUseCase.CreateInvoice(c.Context(), projectID, req); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Invoice created successfully",
-	})
-}
-
-func (h *InvoiceHandler) DeleteInvoice(c *fiber.Ctx) error {
-	projectID, err := uuid.Parse(c.Params("projectId"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid project ID",
-		})
-	}
-
-	invoiceID, err := uuid.Parse(c.Params("invoiceId"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid invoice ID",
-		})
-	}
-
-	req := requests.DeleteInvoiceRequest{
-		InvoiceID: invoiceID,
-	}
-
-	if err := h.invoiceUseCase.DeleteInvoice(c.Context(), projectID, req); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Invoice deleted successfully",
-	})
 }
 
 func (h *InvoiceHandler) GetProjectInvoices(c *fiber.Ctx) error {
@@ -99,5 +48,71 @@ func (h *InvoiceHandler) GetProjectInvoices(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Invoices retrieved successfully",
 		"data":    invoices,
+	})
+}
+
+func (h *InvoiceHandler) GetInvoiceByID(c *fiber.Ctx) error {
+	invoiceID, err := uuid.Parse(c.Params("invoiceId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid invoice ID",
+		})
+	}
+
+	invoice, err := h.invoiceUseCase.GetInvoiceByID(c.Context(), invoiceID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Invoice retrieved successfully",
+		"data":    invoice,
+	})
+}
+
+func (h *InvoiceHandler) UpdateInvoiceStatus(c *fiber.Ctx) error {
+	invoiceID, err := uuid.Parse(c.Params("invoiceId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid invoice ID",
+		})
+	}
+
+	var req requests.UpdateInvoiceStatusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if err := h.invoiceUseCase.UpdateInvoiceStatus(c.Context(), invoiceID, req); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Invoice status updated successfully",
+	})
+}
+
+func (h *InvoiceHandler) CreateInvoicesForAllPeriods(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("projectId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid project ID",
+		})
+	}
+
+	if err := h.invoiceUseCase.CreateInvoicesForAllPeriods(c.Context(), projectID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "Invoices created successfully for all periods",
 	})
 }

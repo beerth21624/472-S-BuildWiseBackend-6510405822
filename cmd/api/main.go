@@ -105,7 +105,7 @@ func main() {
 	QuotationHandler.QuotationRoutes(app)
 
 	invoiceRepo := postgres.NewInvoiceRepository(db)
-	invoiceUseCase := usecase.NewInvoiceUsecase(invoiceRepo, projectRepo)
+	invoiceUseCase := usecase.NewInvoiceUsecase(invoiceRepo, projectRepo, contractRepo)
 	InvoiceHandler := rest.NewInvoiceHandler(invoiceUseCase)
 	InvoiceHandler.InvoiceRoutes(app)
 

@@ -159,6 +159,22 @@ func (r *contractRepository) Delete(ctx context.Context, projectID uuid.UUID) er
 	return nil
 }
 
+// GetByID ...
+func (r *contractRepository) GetByID(ctx context.Context, projectID uuid.UUID) (*models.Contract, error) {
+	var contract models.Contract
+	query := `SELECT * FROM contract WHERE project_id = $1`
+
+	err := r.db.GetContext(ctx, &contract, query, projectID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get contract: %w", err)
+	}
+
+	return &contract, nil
+}
+
 // GetByProjectID ...
 func (r *contractRepository) GetByProjectID(ctx context.Context, projectID uuid.UUID) (*models.Contract, error) {
 	var contract models.Contract
