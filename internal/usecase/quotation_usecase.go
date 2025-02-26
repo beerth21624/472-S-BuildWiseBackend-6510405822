@@ -23,17 +23,14 @@ type QuotationUsecase interface {
 }
 
 type quotationUsecase struct {
-	quotationRepo   repositories.QuotationRepository
-	contractUsecase ContractUseCase // Add contract usecase
+	quotationRepo repositories.QuotationRepository
 }
 
 func NewQuotationUsecase(
 	quotationRepo repositories.QuotationRepository,
-	contractUsecase ContractUseCase,
 ) QuotationUsecase {
 	return &quotationUsecase{
-		quotationRepo:   quotationRepo,
-		contractUsecase: contractUsecase,
+		quotationRepo: quotationRepo,
 	}
 }
 
@@ -165,16 +162,6 @@ func (u *quotationUsecase) ApproveQuotation(ctx context.Context, projectID uuid.
 	err = u.quotationRepo.ApproveQuotation(ctx, projectID)
 	if err != nil {
 		return fmt.Errorf("failed to approve quotation: %w", err)
-	}
-
-	// Create contract after quotation approval
-	req := requests.CreateContractRequest{
-		ProjectID: projectID,
-	}
-	err = u.contractUsecase.Create(ctx, &req)
-	fmt.Println("Contract created successfully")
-	if err != nil {
-		return fmt.Errorf("failed to create contract: %w", err)
 	}
 
 	// Get updated quotation details for response

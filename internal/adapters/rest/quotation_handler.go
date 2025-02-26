@@ -4,6 +4,7 @@ package rest
 import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/usecase"
+	"fmt"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -11,11 +12,13 @@ import (
 
 type QuotationHandler struct {
 	quotationUsecase usecase.QuotationUsecase
+	contractUsecase  usecase.ContractUseCase
 }
 
-func NewQuotationHandler(quotationUsecase usecase.QuotationUsecase) *QuotationHandler {
+func NewQuotationHandler(quotationUsecase usecase.QuotationUsecase, contractUsecase usecase.ContractUseCase) *QuotationHandler {
 	return &QuotationHandler{
 		quotationUsecase: quotationUsecase,
+		contractUsecase:  contractUsecase,
 	}
 }
 
@@ -107,6 +110,13 @@ func (h *QuotationHandler) ApproveQuotation(c *fiber.Ctx) error {
 				"details": err.Error(),
 			})
 		}
+	}
+	req := requests.CreateContractRequest{
+		ProjectID: projectID,
+	}
+
+	if err := h.contractUsecase.Create(c.Context(), &req); err != nil {
+		return fmt.Errorf("failed to create contract: %w", err)
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{

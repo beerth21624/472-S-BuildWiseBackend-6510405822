@@ -402,63 +402,54 @@ func (u *contractUseCase) GetByProjectID(ctx context.Context, projectID uuid.UUI
 
 	return response, nil
 }
-func calculateRetentionMoney(jobs []models.QuotationJob) float64 {
-	var total float64
-	for _, job := range jobs {
-		if job.TotalSellingPrice.Valid {
-			total += job.TotalSellingPrice.Float64
-		}
-	}
-	return total * 0.05 // 5% retention
-}
 
 func (u *contractUseCase) ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error {
 	//contractRepo.ChangeStatus(ctx context.Context, projectID uuid.UUID, status string) error
 
-	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
+	contract, err := u.GetByProjectID(ctx, projectID)
 	if err != nil {
 
 		return fmt.Errorf("failed to get contract: %w", err)
 	}
 
 	//validate every filled in contract is not empty
-	if contract.ProjectDescription.String == "" {
+	if contract.ProjectDescription == "" {
 		return fmt.Errorf("project description is empty")
 	}
-	if contract.AreaSize.Float64 == 0 {
+	if contract.AreaSize == 0 {
 		return fmt.Errorf("area size is empty")
 	}
-	if contract.StartDate.Time.IsZero() {
+	if contract.StartDate.IsZero() {
 		return fmt.Errorf("start date is empty")
 	}
-	if contract.EndDate.Time.IsZero() {
+	if contract.EndDate.IsZero() {
 		return fmt.Errorf("end date is empty")
 	}
-	if contract.ForceMajeure.String == "" {
+	if contract.ForceMajeure == "" {
 		return fmt.Errorf("force majeure is empty")
 	}
-	if contract.BreachOfContract.String == "" {
+	if contract.BreachOfContract == "" {
 		return fmt.Errorf("breach of contract is empty")
 	}
-	if contract.EndOfContract.String == "" {
+	if contract.EndOfContract == "" {
 		return fmt.Errorf("end of contract is empty")
 	}
-	if contract.TerminationContract.String == "" {
+	if contract.TerminationContract == "" {
 		return fmt.Errorf("termination contract is empty")
 	}
-	if contract.Amendment.String == "" {
+	if contract.Amendment == "" {
 		return fmt.Errorf("amendment is empty")
 	}
-	if contract.GuaranteeWithin.Int32 == 0 {
+	if contract.GuaranteeWithin == 0 {
 		return fmt.Errorf("guarantee within is empty")
 	}
-	if contract.RetentionMoney.Float64 == 0 {
+	if contract.RetentionMoney == 0 {
 		return fmt.Errorf("retention money is empty")
 	}
-	if contract.PayWithin.Int32 == 0 {
+	if contract.PayWithin == 0 {
 		return fmt.Errorf("pay within is empty")
 	}
-	if contract.ValidateWithin.Int32 == 0 {
+	if contract.ValidateWithin == 0 {
 		return fmt.Errorf("validate within is empty")
 	}
 	if len(contract.Format) == 0 {

@@ -10,11 +10,13 @@ import (
 
 type ContractHandler struct {
 	contractUseCase usecase.ContractUseCase
+	invoiceUseCase  usecase.InvoiceUseCase
 }
 
-func NewContractHandler(contractUseCase usecase.ContractUseCase) *ContractHandler {
+func NewContractHandler(contractUseCase usecase.ContractUseCase, invoiceUseCase usecase.InvoiceUseCase) *ContractHandler {
 	return &ContractHandler{
 		contractUseCase: contractUseCase,
+		invoiceUseCase:  invoiceUseCase,
 	}
 }
 
@@ -120,6 +122,12 @@ func (h *ContractHandler) ChangeStatus(c *fiber.Ctx) error {
 	}
 
 	if err := h.contractUseCase.ChangeStatus(c.Context(), projectID, "approved"); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": err.Error(),
+		})
+	}
+
+	if err := h.invoiceUseCase.CreateInvoicesForAllPeriods(c.Context(), projectID); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": err.Error(),
 		})

@@ -96,18 +96,18 @@ func main() {
 	contractRepo := postgres.NewContractRepository(db)
 	quotationRepo := postgres.NewQuotationRepository(db)
 	periodRepo := postgres.NewPeriodRepository(db)
-	contractUseCase := usecase.NewContractUsecase(contractRepo, periodRepo, projectRepo, quotationRepo, jobRepo)
-	ContractHandler := rest.NewContractHandler(contractUseCase)
-	ContractHandler.ContractRoutes(app)
-
-	quotationUseCase := usecase.NewQuotationUsecase(quotationRepo, contractUseCase)
-	QuotationHandler := rest.NewQuotationHandler(quotationUseCase)
-	QuotationHandler.QuotationRoutes(app)
-
 	invoiceRepo := postgres.NewInvoiceRepository(db)
 	invoiceUseCase := usecase.NewInvoiceUsecase(invoiceRepo, projectRepo, contractRepo)
 	InvoiceHandler := rest.NewInvoiceHandler(invoiceUseCase)
 	InvoiceHandler.InvoiceRoutes(app)
+
+	contractUseCase := usecase.NewContractUsecase(contractRepo, periodRepo, projectRepo, quotationRepo, jobRepo)
+	ContractHandler := rest.NewContractHandler(contractUseCase, invoiceUseCase)
+	ContractHandler.ContractRoutes(app)
+
+	quotationUseCase := usecase.NewQuotationUsecase(quotationRepo)
+	QuotationHandler := rest.NewQuotationHandler(quotationUseCase, contractUseCase)
+	QuotationHandler.QuotationRoutes(app)
 
 	port := getEnv("PORT", "8004")
 	if err := app.Listen(":" + port); err != nil {
