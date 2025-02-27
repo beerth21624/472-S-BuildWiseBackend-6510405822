@@ -16,6 +16,7 @@ type InvoiceResponse struct {
 	PaymentTerm    string         `json:"payment_term"`
 	Remarks        string         `json:"remarks"`
 	Status         string         `json:"status"`
+	Retention      float64        `json:"retention"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 	Period         PeriodResponse `json:"period"`

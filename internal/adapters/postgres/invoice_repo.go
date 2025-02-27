@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -204,6 +206,49 @@ func (r *invoiceRepository) UpdateStatus(ctx context.Context, invoiceID uuid.UUI
 	result, err := r.db.ExecContext(ctx, query, status, invoiceID)
 	if err != nil {
 		return fmt.Errorf("failed to update invoice status: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return errors.New("invoice not found")
+	}
+
+	return nil
+}
+
+func (r *invoiceRepository) Update(ctx context.Context, invoiceID uuid.UUID, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return errors.New("no fields to update")
+	}
+	query := "UPDATE invoice SET "
+
+	fields := []string{}
+	values := []interface{}{}
+	paramCount := 1
+
+	for field, value := range updates {
+		fields = append(fields, fmt.Sprintf("%s = $%d", field, paramCount))
+		values = append(values, value)
+		paramCount++
+	}
+
+	// Add updated_at field
+	fields = append(fields, fmt.Sprintf("updated_at = $%d", paramCount))
+	values = append(values, time.Now())
+	paramCount++
+
+	query += strings.Join(fields, ", ")
+
+	query += fmt.Sprintf(" WHERE invoice_id = $%d", paramCount)
+	values = append(values, invoiceID)
+
+	result, err := r.db.ExecContext(ctx, query, values...)
+	if err != nil {
+		return fmt.Errorf("failed to update invoice: %w", err)
 	}
 
 	rows, err := result.RowsAffected()

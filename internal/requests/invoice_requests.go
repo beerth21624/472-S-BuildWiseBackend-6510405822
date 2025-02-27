@@ -20,3 +20,12 @@ type UpdateInvoiceStatusRequest struct {
 type UpdateInvoicePaidRequest struct {
 	PaidDate string `json:"paid_date" validate:"required,datetime=2006-01-02"`
 }
+
+type UpdateInvoiceRequest struct {
+	InvoiceDate    *string  `json:"invoice_date" validate:"omitempty,datetime=2006-01-02"`
+	PaymentDueDate *string  `json:"payment_due_date" validate:"omitempty,datetime=2006-01-02"`
+	PaidDate       *string  `json:"paid_date" validate:"omitempty,datetime=2006-01-02"`
+	PaymentTerm    *string  `json:"payment_term"`
+	Remarks        *string  `json:"remarks"`
+	Retention      *float64 `json:"retention"`
+}

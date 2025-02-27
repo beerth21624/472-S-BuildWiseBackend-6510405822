@@ -27,6 +27,7 @@ func (h *InvoiceHandler) InvoiceRoutes(app *fiber.App) {
 	invoiceDetail := app.Group("/invoice")
 	invoiceDetail.Get("/:invoiceId", h.GetInvoiceByID)
 	invoiceDetail.Put("/:invoiceId/status", h.UpdateInvoiceStatus)
+	invoiceDetail.Put("/:invoiceId", h.UpdateInvoice)
 
 }
 
@@ -114,5 +115,31 @@ func (h *InvoiceHandler) CreateInvoicesForAllPeriods(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Invoices created successfully for all periods",
+	})
+}
+
+func (h *InvoiceHandler) UpdateInvoice(c *fiber.Ctx) error {
+	invoiceID, err := uuid.Parse(c.Params("invoiceId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid invoice ID",
+		})
+	}
+
+	var req requests.UpdateInvoiceRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	if err := h.invoiceUseCase.UpdateInvoice(c.Context(), invoiceID, req); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Invoice updated successfully",
 	})
 }
