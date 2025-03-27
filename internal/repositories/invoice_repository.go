@@ -8,9 +8,10 @@ import (
 )
 
 type InvoiceRepository interface {
-	Create(ctx context.Context, projectID uuid.UUID, fileURL string) error
-	Delete(ctx context.Context, invoiceID uuid.UUID) error
+	ValidateProjectStatus(ctx context.Context, projectID uuid.UUID) error
+	CreateForAllPeriods(ctx context.Context, projectID uuid.UUID, contractID uuid.UUID, paymentTerm string) error
 	GetByID(ctx context.Context, invoiceID uuid.UUID) (*models.Invoice, error)
 	GetByProjectID(ctx context.Context, projectID uuid.UUID) ([]models.Invoice, error)
-	ValidateProjectStatus(ctx context.Context, projectID uuid.UUID) error
+	UpdateStatus(ctx context.Context, invoiceID uuid.UUID, status string) error
+	Update(ctx context.Context, invoiceID uuid.UUID, updates map[string]interface{}) error // New method
 }

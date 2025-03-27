@@ -36,6 +36,20 @@ func (r *jobRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Job,
 	return &job, nil
 }
 
+func (r *jobRepository) GetJobsByIDs(ctx context.Context, ids []uuid.UUID) ([]models.Job, error) {
+	var jobs []models.Job
+	query, args, err := sqlx.In(`SELECT * FROM Job WHERE job_id IN (?)`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare query: %w", err)
+	}
+	query = r.db.Rebind(query)
+	err = r.db.SelectContext(ctx, &jobs, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jobs by IDs: %w", err)
+	}
+	return jobs, nil
+}
+
 func (r *jobRepository) GetJobMaterialByID(ctx context.Context, id uuid.UUID) (responses.JobMaterialResponse, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -451,4 +465,22 @@ func (r *jobRepository) UpdateJobMaterialQuantity(ctx context.Context, jobID uui
 type UpdateJobMaterialQuantityRequest struct {
 	MaterialID uuid.UUID `json:"material_id" validate:"required"`
 	Quantity   int       `json:"quantity" validate:"required,gt=0"`
+}
+
+func (r *jobRepository) GetJobByProjectID(ctx context.Context, projectID uuid.UUID) ([]responses.JobResponse, error) {
+	query := `
+		SELECT DISTINCT j.job_id, j.name, j.description, j.unit, bj.quantity, bj.labor_cost
+		FROM job j
+		INNER JOIN boq_job bj ON j.job_id = bj.job_id
+		INNER JOIN boq b ON bj.boq_id = b.boq_id
+		WHERE b.project_id = $1
+	`
+
+	var jobs []responses.JobResponse
+	err := r.db.SelectContext(ctx, &jobs, query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jobs by project ID: %w", err)
+	}
+
+	return jobs, nil
 }

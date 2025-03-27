@@ -20,6 +20,7 @@ type JobUseCase interface {
 	AddMaterial(ctx context.Context, jobID uuid.UUID, req requests.AddJobMaterialRequest) error
 	DeleteMaterial(ctx context.Context, jobID uuid.UUID, materialID string) error
 	UpdateMaterialQuantity(ctx context.Context, jobID uuid.UUID, req requests.UpdateJobMaterialQuantityRequest) error
+	GetJobByProjectID(ctx context.Context, projectID uuid.UUID) ([]responses.JobResponse, error)
 }
 
 type jobUseCase struct {
@@ -111,4 +112,8 @@ func (u *jobUseCase) UpdateMaterialQuantity(ctx context.Context, jobID uuid.UUID
 	}
 
 	return u.jobRepo.UpdateJobMaterialQuantity(ctx, jobID, req)
+}
+
+func (u *jobUseCase) GetJobByProjectID(ctx context.Context, projectID uuid.UUID) ([]responses.JobResponse, error) {
+	return u.jobRepo.GetJobByProjectID(ctx, projectID)
 }

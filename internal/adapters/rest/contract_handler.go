@@ -10,62 +10,38 @@ import (
 
 type ContractHandler struct {
 	contractUseCase usecase.ContractUseCase
+	invoiceUseCase  usecase.InvoiceUseCase
 }
 
-func NewContractHandler(contractUseCase usecase.ContractUseCase) *ContractHandler {
+func NewContractHandler(contractUseCase usecase.ContractUseCase, invoiceUseCase usecase.InvoiceUseCase) *ContractHandler {
 	return &ContractHandler{
 		contractUseCase: contractUseCase,
+		invoiceUseCase:  invoiceUseCase,
 	}
 }
 
 func (h *ContractHandler) ContractRoutes(app *fiber.App) {
-	contract := app.Group("/contracts/:projectId")
-
-	contract.Get("/", h.GetContract)
+	contract := app.Group("/contracts")
 	contract.Post("/", h.CreateContract)
-	contract.Delete("/", h.DeleteContract)
-}
+	contract.Put("/:project_id", h.UpdateContract)
+	contract.Delete("/:project_id", h.DeleteContract)
+	//change status of contract
 
-func (h *ContractHandler) GetContract(c *fiber.Ctx) error {
-	projectID, err := uuid.Parse(c.Params("projectId"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid project ID",
-		})
-	}
-
-	contract, err := h.contractUseCase.GetContract(c.Context(), projectID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Contract retrieved successfully",
-		"data":    contract,
-	})
-
+	contract.Put("/:project_id/status", h.ChangeStatus)
+	contract.Get("/:project_id", h.GetContractByProjectID)
 }
 
 func (h *ContractHandler) CreateContract(c *fiber.Ctx) error {
-	projectID, err := uuid.Parse(c.Params("projectId"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid project ID",
-		})
-	}
-
-	var req requests.UploadContractRequest
+	var req requests.CreateContractRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
+			"message": "Invalid request body",
 		})
 	}
 
-	if err := h.contractUseCase.CreateContract(c.Context(), projectID, req); err != nil {
+	if err := h.contractUseCase.Create(c.Context(), &req); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+			"message": err.Error(),
 		})
 	}
 
@@ -74,21 +50,90 @@ func (h *ContractHandler) CreateContract(c *fiber.Ctx) error {
 	})
 }
 
-func (h *ContractHandler) DeleteContract(c *fiber.Ctx) error {
-	projectID, err := uuid.Parse(c.Params("projectId"))
+func (h *ContractHandler) UpdateContract(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("project_id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid project ID",
+			"message": "Invalid project ID",
 		})
 	}
 
-	if err := h.contractUseCase.DeleteContract(c.Context(), projectID); err != nil {
+	var req requests.UpdateContractRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid request body",
+		})
+	}
+
+	if err := h.contractUseCase.Update(c.Context(), projectID, &req); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+			"message": err.Error(),
 		})
 	}
 
-	return c.JSON(fiber.Map{
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Contract updated successfully",
+	})
+}
+
+func (h *ContractHandler) DeleteContract(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("project_id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid project ID",
+		})
+	}
+
+	if err := h.contractUseCase.Delete(c.Context(), projectID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Contract deleted successfully",
+	})
+}
+
+func (h *ContractHandler) GetContractByProjectID(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("project_id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid project ID",
+		})
+	}
+
+	contract, err := h.contractUseCase.GetByProjectID(c.Context(), projectID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(contract)
+}
+
+func (h *ContractHandler) ChangeStatus(c *fiber.Ctx) error {
+	projectID, err := uuid.Parse(c.Params("project_id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Invalid project ID",
+		})
+	}
+
+	if err := h.contractUseCase.ChangeStatus(c.Context(), projectID, "approved"); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": err.Error(),
+		})
+	}
+
+	if err := h.invoiceUseCase.CreateInvoicesForAllPeriods(c.Context(), projectID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Contract status updated successfully",
 	})
 }
