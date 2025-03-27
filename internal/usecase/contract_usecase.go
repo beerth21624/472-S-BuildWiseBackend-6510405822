@@ -45,7 +45,10 @@ func NewContractUsecase(
 }
 
 func (u *contractUseCase) Create(ctx context.Context, req *requests.CreateContractRequest) error {
-	// Create the contract first
+	project, err := u.projectRepo.GetByID(ctx, req.ProjectID)
+	if err != nil {
+		return fmt.Errorf("failed to get project: %w", err)
+	}
 	contract := &models.Contract{
 		ProjectID: req.ProjectID,
 		ProjectDescription: sql.NullString{
@@ -56,13 +59,14 @@ func (u *contractUseCase) Create(ctx context.Context, req *requests.CreateContra
 			Float64: req.AreaSize,
 			Valid:   req.AreaSize != 0,
 		},
+
 		StartDate: sql.NullTime{
-			Time:  req.StartDate,
-			Valid: !req.StartDate.IsZero(),
+			Time:  project.CreatedAt,
+			Valid: true,
 		},
 		EndDate: sql.NullTime{
-			Time:  req.EndDate,
-			Valid: !req.EndDate.IsZero(),
+			Time:  project.CreatedAt,
+			Valid: true,
 		},
 		ForceMajeure: sql.NullString{
 			String: req.ForceMajeure,
@@ -439,18 +443,6 @@ func (u *contractUseCase) ChangeStatus(ctx context.Context, projectID uuid.UUID,
 	}
 	if contract.Amendment == "" {
 		return fmt.Errorf("amendment is empty")
-	}
-	if contract.GuaranteeWithin == 0 {
-		return fmt.Errorf("guarantee within is empty")
-	}
-	if contract.RetentionMoney == 0 {
-		return fmt.Errorf("retention money is empty")
-	}
-	if contract.PayWithin == 0 {
-		return fmt.Errorf("pay within is empty")
-	}
-	if contract.ValidateWithin == 0 {
-		return fmt.Errorf("validate within is empty")
 	}
 	if len(contract.Format) == 0 {
 		return fmt.Errorf("format is empty")

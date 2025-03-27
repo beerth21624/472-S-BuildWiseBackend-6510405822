@@ -112,7 +112,18 @@ func (h *QuotationHandler) ApproveQuotation(c *fiber.Ctx) error {
 		}
 	}
 	req := requests.CreateContractRequest{
-		ProjectID: projectID,
+		ProjectID:           projectID,
+		ProjectDescription:  "",
+		AreaSize:            0,
+		ForceMajeure:        "",
+		BreachOfContract:    "",
+		EndOfContract:       "",
+		TerminationContract: "",
+		Amendment:           "",
+		GuaranteeWithin:     0,
+		RetentionMoney:      0,
+		PayWithin:           0,
+		ValidateWithin:      0,
 	}
 
 	if err := h.contractUsecase.Create(c.Context(), &req); err != nil {

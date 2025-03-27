@@ -5,11 +5,17 @@ import (
 	"boonkosang/internal/requests"
 	"boonkosang/internal/responses"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+)
+
+var (
+	ErrProjectNotInProgress = errors.New("project is not in progress")
+	ErrContractNotApproved  = errors.New("contract is not approved")
 )
 
 type InvoiceUseCase interface {
@@ -153,7 +159,6 @@ func (u *invoiceUseCase) GetInvoiceByID(ctx context.Context, invoiceID uuid.UUID
 
 	return response, nil
 }
-
 func (u *invoiceUseCase) UpdateInvoiceStatus(ctx context.Context, invoiceID uuid.UUID, req requests.UpdateInvoiceStatusRequest) error {
 	invoice, err := u.invoiceRepo.GetByID(ctx, invoiceID)
 	if err != nil {
@@ -164,8 +169,26 @@ func (u *invoiceUseCase) UpdateInvoiceStatus(ctx context.Context, invoiceID uuid
 		return errors.New("invoice not found")
 	}
 
+	// Prevent reverting from approved to draft
 	if invoice.Status.Valid && invoice.Status.String == "approved" && req.Status == "draft" {
 		return errors.New("cannot change status from approved to draft")
+	}
+
+	if req.Status == "approved" {
+		var missingFields []string
+		if !invoice.InvoiceDate.Valid {
+			missingFields = append(missingFields, "invoice_date")
+		}
+		if !invoice.PaymentDueDate.Valid {
+			missingFields = append(missingFields, "payment_due_date")
+		}
+		if !invoice.PaymentTerm.Valid {
+			missingFields = append(missingFields, "payment_term")
+		}
+
+		if len(missingFields) > 0 {
+			return fmt.Errorf("cannot approve invoice, required fields are missing: %v", missingFields)
+		}
 	}
 
 	err = u.invoiceRepo.UpdateStatus(ctx, invoiceID, req.Status)
@@ -175,7 +198,6 @@ func (u *invoiceUseCase) UpdateInvoiceStatus(ctx context.Context, invoiceID uuid
 
 	return nil
 }
-
 func (u *invoiceUseCase) CreateInvoicesForAllPeriods(ctx context.Context, projectID uuid.UUID) error {
 	project, err := u.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
@@ -184,6 +206,7 @@ func (u *invoiceUseCase) CreateInvoicesForAllPeriods(ctx context.Context, projec
 	if project == nil {
 		return errors.New("project not found")
 	}
+
 	contract, err := u.contractRepo.GetByProjectID(ctx, projectID)
 	if err != nil {
 		return fmt.Errorf("failed to get contract: %w", err)
@@ -195,9 +218,14 @@ func (u *invoiceUseCase) CreateInvoicesForAllPeriods(ctx context.Context, projec
 		return errors.New("contract does not belong to the specified project")
 	}
 
-	if !contract.PayWithin.Valid {
-		return errors.New("contract PayWithin is not valid")
+	if !contract.Status.Valid || contract.Status.String != "approved" {
+		return errors.New("contract is not approved")
 	}
+
+	if !contract.PayWithin.Valid {
+		contract.PayWithin = sql.NullInt32{Int32: 0, Valid: true}
+	}
+
 	err = u.invoiceRepo.CreateForAllPeriods(ctx, projectID, contract.ContractID, "")
 	if err != nil {
 		return fmt.Errorf("failed to create invoices: %w", err)
@@ -205,7 +233,6 @@ func (u *invoiceUseCase) CreateInvoicesForAllPeriods(ctx context.Context, projec
 
 	return nil
 }
-
 func (u *invoiceUseCase) UpdateInvoice(ctx context.Context, invoiceID uuid.UUID, req requests.UpdateInvoiceRequest) error {
 	invoice, err := u.invoiceRepo.GetByID(ctx, invoiceID)
 	if err != nil {
@@ -214,6 +241,10 @@ func (u *invoiceUseCase) UpdateInvoice(ctx context.Context, invoiceID uuid.UUID,
 
 	if invoice == nil {
 		return errors.New("invoice not found")
+	}
+
+	if invoice.Status.Valid && invoice.Status.String == "approved" {
+		return errors.New("cannot edit approved invoice")
 	}
 
 	updates := make(map[string]interface{})
@@ -234,14 +265,6 @@ func (u *invoiceUseCase) UpdateInvoice(ctx context.Context, invoiceID uuid.UUID,
 		updates["payment_due_date"] = date
 	}
 
-	if req.PaidDate != nil {
-		date, err := time.Parse("2006-01-02", *req.PaidDate)
-		if err != nil {
-			return fmt.Errorf("invalid paid date format: %w", err)
-		}
-		updates["paid_date"] = date
-	}
-
 	if req.PaymentTerm != nil {
 		updates["payment_term"] = *req.PaymentTerm
 	}
@@ -250,18 +273,10 @@ func (u *invoiceUseCase) UpdateInvoice(ctx context.Context, invoiceID uuid.UUID,
 		updates["remarks"] = *req.Remarks
 	}
 
-	if req.Retention != nil {
-		if *req.Retention < 0 || *req.Retention > 100 {
-			return fmt.Errorf("retention must be between 0 and 100")
-		}
-		updates["retention"] = *req.Retention
-	}
-
 	if len(updates) == 0 {
 		return errors.New("no fields to update")
 	}
 
-	// Update the invoice
 	err = u.invoiceRepo.Update(ctx, invoiceID, updates)
 	if err != nil {
 		return fmt.Errorf("failed to update invoice: %w", err)
